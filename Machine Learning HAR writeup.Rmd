@@ -1,0 +1,80 @@
+---
+title: "HAR assignment"
+author: "PJ"
+date: "April 17, 2016"
+output: html_document
+---
+
+The Human Activity Recognition dataset contains some excellent data of people exercising with Dumbbells. More details about the data are available on this website:
+http://groupware.les.inf.puc-rio.br/har
+
+The following brief report explains how a simple random forest model was created using this data. 
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r}
+library(caret)
+training <- read.csv("./pml-training.csv",
+                     stringsAsFactors=T)
+inTrain <- createDataPartition(training$classe, p=0.7)[[1]]
+t <- training[inTrain,]
+v <- training[-inTrain,]
+testing <- read.csv("pml-testing.csv", stringsAsFactors = T)
+```
+
+
+# Exploratory Analysis
+
+```{r, results=FALSE}
+library(ggplot2)
+View(t)
+# summary(t)
+```
+After looking at the data table and summary information, I evaluated which variables commonly contained numerical data and realized that the most reliable variables were the roll,pitch and yaw data from each of the three location - belt, arm and dumbbell. 
+Most of the other variables contain lots of missing and NAN data, so they wouldn't be immediately useful for training the model without pre-processing the data. 
+
+I looked at particular variables for easy trends like:
+1) Was particular individuals asked to do only certain types of exercise classes.
+2) Was there a sequence followed that might be reflected in the timestamp data. 
+
+```{r}
+
+plot(training$user_name,training$classe, xlab="User Name", ylab = "Classe")
+qplot(X,raw_timestamp_part_2,color=user_name, data =training)
+```
+As you can see, both these variables seem to be unrelated to the classe variable.
+
+# Model Building
+Armed with this information, I decided to try a simple random forest model, with cross-validation as follows.
+
+```{r}
+modrf <- train(classe ~ roll_belt + pitch_belt + yaw_belt + roll_arm + pitch_arm + yaw_arm + roll_dumbbell + pitch_dumbbell + yaw_dumbbell, data = t, method = "rf",trControl = trainControl(method = "cv", number = 3))
+modrf
+```
+
+As you can see, the accuracy of the model is predicted to be as high as 95%. 
+# Validation
+
+Let's evaluate how it does on the training data. 
+
+``` {r}
+predv <- predict(modrf, v)
+agree <- predv == v$classe
+v <- cbind(v, predv,agree)
+qplot(X,predv, color = agree, data = v)
+
+```
+
+As shown by the scatter plot, the model works very well on the validation data. 
+
+# Prediction
+Using this model, we can predict the classe variable for the testing dataset.
+
+```{r}
+results <- predict(modrf, testing)
+results
+```
